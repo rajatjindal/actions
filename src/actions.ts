@@ -1,8 +1,9 @@
 import * as cloud from './cloud'
+import * as aka from './aka'
 import * as core from '@actions/core'
 import * as github from './github'
 import * as spin from './spin'
-import {context} from '@actions/github'
+import { context } from '@actions/github'
 
 const FERMYON_GITHUB_ORG = 'fermyon'
 const SPIN_GITHUB_REPO = 'spin'
@@ -84,7 +85,7 @@ export async function deployPreview(prNumber: number): Promise<string> {
   core.info(`🚀 deploying preview as ${previewAppName} to Fermyon Cloud`)
   const kvPairs = getKeyValuePairs()
   const variables = getDeployVariables()
-  await cloud.deployAs(previewAppName, manifestFile, kvPairs, variables)
+  const app = await cloud.deployAs(previewAppName, manifestFile, kvPairs, variables)
 
   const domain = await getDomainForApp(previewAppName)
   const comment = `🚀 preview deployed successfully to Fermyon Cloud and available at ${domain}`
@@ -156,4 +157,58 @@ export function getCloudClient(): cloud.Client {
   })
 
   return cloud.initClient(cloudToken)
+}
+
+// AKA related actions
+export async function aka_deploy(): Promise<string> {
+  const manifestFile = getManifestFile()
+  const variables = getDeployVariables()
+  const accountId = core.getInput('account_id')
+  const nameOverride = core.getInput('name_override')
+
+  const app = await aka.deploy(manifestFile, accountId, nameOverride, variables)
+  return app.urls && app.urls.length > 0 ? app.urls[0] : "n/a"
+}
+
+export async function deployAkaPreview(prNumber: number): Promise<string> {
+  const manifestFile = getManifestFile()
+  const spinConfig = spin.getAppManifest(manifestFile)
+
+  const realAppName = spinConfig.name
+  const previewAppName = `${realAppName}-pr-${prNumber}`
+
+  core.info(`🚀 deploying preview as ${previewAppName} to Fermyon Wasm Functions`)
+  const kvPairs = getKeyValuePairs()
+  const variables = getDeployVariables()
+  const accountId = core.getInput('account_id')
+
+  const app = await aka.deploy(manifestFile, accountId, previewAppName, variables)
+  const domain = app.urls && app.urls.length > 0 ? app.urls[0] : "n/a"
+  const comment = `🚀 preview deployed successfully to Fermyon Wasm Functions and available at ${domain}`
+  core.info(comment)
+
+  await github.updateComment(
+    context.repo.owner,
+    context.repo.repo,
+    prNumber,
+    comment
+  )
+
+  return domain
+}
+
+export async function undeployAkaPreview(prNumber: number): Promise<void> {
+  const manifestFile = getManifestFile()
+  const spinConfig = spin.getAppManifest(manifestFile)
+  const accountId = core.getInput('account_id')
+  const previewAppName = `${spinConfig.name}-pr-${prNumber}`
+
+  try {
+    const app = await aka.getAppByName(previewAppName, accountId)
+    core.info(`cleaning up preview for pr ${prNumber}`)
+    await aka.deleteAppById(app.id)
+    core.info(`preview deployment removed successfully`)
+  } catch (error) {
+    core.info(`no preview found for pr ${prNumber}`)
+  }
 }

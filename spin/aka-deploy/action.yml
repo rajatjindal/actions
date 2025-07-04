@@ -1,0 +1,33 @@
+name: 'Build and deploy Spin app to AKA'
+description: 'Build and deploy Spin app to AKA'
+author: 'Fermyon Engineering'
+inputs:
+  manifest_file:
+    required: false
+    description: 'path to spin.toml file'
+    default: 'spin.toml'
+  fermyon_aka_token:
+    required: false
+    description: 'personal access token for Fermyon Cloud'
+  account_id:
+    required: false
+    description: 'account_id to deploy this app to'
+  name_override:
+    required: false
+    description: 'deploy this app using this name instead of using the name provided in spin.toml'
+  key_values:
+    required: false
+    description: 'Pass a key/value (key=value) to all components of the application. You can specify multiple key_values by putting each key/value pair on its own line'
+  run_build:
+    required: false
+    description: 'run `spin build` if enabled (default)'  
+    default: true
+  variables:
+    required: false
+    description: 'Pass a variable (variable=value) to all components of the application. You can specify multiple variables by putting each variable/value pair on its own line'
+outputs:
+  app-url:
+    description: 'the URL of the deployed app'
+runs:
+  using: 'node20'
+  main: '../../dist/spin/aka-deploy/index.js'
